@@ -69,6 +69,7 @@ const POSTSYS = `You turn a customer chat with LAK Security Services (gate motor
 SOCIAL POST: a ready-to-post Facebook/WhatsApp Status post (2-4 short sentences) that answers the customer's underlying question helpfully, never uses the customer's name or phone, never invents prices, guarantees or response times, and ends with a call to message LAK.
 WHAT THIS CHAT TELLS YOU: one or two short lines on the demand signal (what the customer needed, what kind of customers ask this). If the chat has too little content, say so briefly and base the post on the topic the customer raised.`;
 const HITS = [];
+const POSTS = {};
 http.createServer(async (req, res) => {
   if (req.method === 'GET' && req.url.startsWith('/stats')) { const ok = process.env.STATS_KEY && req.url.includes('k=' + process.env.STATS_KEY); res.writeHead(ok ? 200 : 404, { 'Content-Type': 'application/json' }); res.end(ok ? JSON.stringify(HITS.slice(-100)) : '{}'); return; }
   if (req.method === 'GET' && req.url !== '/health' && !req.url.startsWith('/favicon')) { const h = { t: new Date().toISOString(), p: req.url.slice(0, 80), ua: String(req.headers['user-agent'] || '').slice(0, 90) }; HITS.push(h); console.log('HIT ' + JSON.stringify(h)); }
@@ -76,7 +77,8 @@ http.createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/api/chat') {
     let b = ''; req.on('data', c => b += c); req.on('end', async () => {
       try {
-        const { messages, mode } = JSON.parse(b); HITS.push({ t: new Date().toISOString(), chat: messages.length, last: String(messages[messages.length - 1].content).slice(0, 80) });
+        const { messages, mode } = JSON.parse(b);
+        if (mode === 'post') { const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim(); const d = new Date().toISOString().slice(0, 10); const k = ip + d; POSTS[k] = (POSTS[k] || 0) + 1; if (POSTS[k] > 3) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ reply: 'That is your 3 free tries for today. On the upgrade it writes your posts every week from your real customer chats. Message us and we will set up your first batch.' })); } } HITS.push({ t: new Date().toISOString(), chat: messages.length, last: String(messages[messages.length - 1].content).slice(0, 80) });
         const msgs = [{ role: 'system', content: mode === 'post' ? POSTSYS : SYSTEM }, ...messages.slice(-20).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content).slice(0, 1000) }))];
         let reply = null;
         const chain = [MODEL, 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite'];
