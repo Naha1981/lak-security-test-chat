@@ -23,7 +23,7 @@ form{display:flex;gap:8px;padding:10px;background:#202c33}input{flex:1;padding:1
 <header><b>LAK Security Services</b><small>Test preview by NahaLabs - not live yet</small></header>
 <div class="note">Pretend you are a customer. Type like you would on WhatsApp.</div>
 <div id="log"></div>
-<details class="up"><summary>Coming with your upgrade (preview, not live) &#9656;</summary><div class="in">
+<details class="up"><summary>Coming with your upgrade (preview, not live)</summary><div class="in">
 <p>This chat only answers. On the upgrade, your WhatsApp also finds demand and turns your customer chats into content. Everything below is an EXAMPLE of what it would produce, not live.</p>
 <h4>1. Social posts made from your customer chats <span class="tag">EXAMPLE</span></h4>
 <div class="card">Gate motor not opening? Before you call anyone, check three things: is there power to the motor, is the manual release engaged, and has the remote battery gone flat. Still stuck? We are open 24 hours.
