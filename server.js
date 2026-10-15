@@ -1,16 +1,17 @@
 const http = require('http');
 const KEY = process.env.GEMINI_API_KEY;
 const MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
-const SYSTEM = `You are the instant WhatsApp-style reply assistant for LAK Security Services, a South African business that installs and repairs gate motors, garage doors, CCTV and electric fencing. This is a TEST preview built by NahaLabs so the owner can see how enquiries would be handled. Rules:
+const SYSTEM = `You are the instant WhatsApp-style reply assistant for LAK Security Services, a South African business that installs and repairs gate motors, garage doors and CCTV. LAK is open 24 hours. This is a TEST preview built by NahaLabs so the owner can see how enquiries would be handled. Rules:
 - Reply in short, friendly, plain messages (1-3 sentences). One question at a time.
-- Work out which service the customer needs (gate motor, garage door, CCTV, electric fence, or other).
-- Collect what a site visit needs, one detail at a time. Gate motor or garage door: make/brand if known, what is happening (not opening, noisy, remote not working, power cut), manual or sliding or swing. CCTV: new install or repair, number of cameras, house or business. Electric fence: new install or fault, approximate length, alarm or energiser fault.
+- Work out which service the customer needs (gate motor, garage door, CCTV, or other).
+- Collect what a site visit needs, one detail at a time. Gate motor or garage door: make/brand if known, what is happening (not opening, noisy, remote not working, power cut), manual or sliding or swing. CCTV: new install or repair, number of cameras, house or business.
 - Always collect: customer name, suburb or area, best phone number, preferred day/time for a visit.
+- If asked about hours, say LAK is open 24 hours. If asked about a service outside gate motors, garage doors and CCTV, say the team will confirm whether they can help.
 - Never invent prices, availability, brands, response times or guarantees. If asked about price say the team will confirm after a quick look, or after the site visit details are in.
 - Never claim an appointment is booked. Say the details are noted and a person from LAK will confirm.
 - When you have the service, issue, name, area, phone and preferred time, give a short summary in this format and say the team will confirm:
   SUMMARY FOR LAK: service | issue | name | area | phone | preferred time
-- If the customer says it is an emergency (break-in, fence live danger), tell them to call the LAK team directly and local emergency services if there is danger.
+- If the customer says it is an emergency (break-in), tell them to call the LAK team directly and local emergency services if there is danger.
 - Stay on topic. If asked something unrelated, politely steer back.`;
 const PAGE = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LAK Security - test chat</title>
 <style>body{margin:0;font-family:system-ui,sans-serif;background:#0b141a;color:#e9edef;display:flex;flex-direction:column;height:100vh}
@@ -26,7 +27,7 @@ form{display:flex;gap:8px;padding:10px;background:#202c33}input{flex:1;padding:1
 <script>
 const log=document.getElementById('log'),t=document.getElementById('t');let hist=[];
 function add(c,x){const d=document.createElement('div');d.className='m '+c;d.textContent=x;log.appendChild(d);log.scrollTop=log.scrollHeight;return d}
-add('b','Hi, thanks for contacting LAK Security Services. What do you need help with: gate motor, garage door, CCTV or electric fencing?');
+add('b','Hi, thanks for contacting LAK Security Services. What do you need help with: gate motor, garage door or CCTV?');
 document.getElementById('f').onsubmit=async e=>{e.preventDefault();const v=t.value.trim();if(!v)return;t.value='';add('u',v);hist.push({role:'user',content:v});const w=add('b','...');
 try{const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:hist})});const j=await r.json();w.textContent=j.reply||'Sorry, something went wrong.';hist.push({role:'assistant',content:j.reply||''})}catch(_){w.textContent='Sorry, something went wrong.'}};
 </script></body></html>`;
@@ -49,7 +50,7 @@ http.createServer(async (req, res) => {
             reply = j.choices && j.choices[0] && j.choices[0].message.content;
           } catch (_) {}
         }
-        if (!reply) reply = 'Sorry, I am slow to answer right now. What do you need help with: gate motor, garage door, CCTV or electric fencing?';
+        if (!reply) reply = 'Sorry, I am slow to answer right now. What do you need help with: gate motor, garage door or CCTV?';
         res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ reply: reply || null }));
       } catch (e) { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ reply: null })); }
     }); return;
