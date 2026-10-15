@@ -271,7 +271,7 @@ async function newsFor(q) {
     const x = await r.text(); const out = [];
     for (const m of x.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
       const t = (/<title>([\s\S]*?)<\/title>/.exec(m[1]) || [])[1], l = (/<link>([\s\S]*?)<\/link>/.exec(m[1]) || [])[1], d = (/<pubDate>([\s\S]*?)<\/pubDate>/.exec(m[1]) || [])[1];
-      if (t && l && d && Date.now() - Date.parse(d) < 21 * 86400000) out.push({ t: t.replace(/<!\[CDATA\[|\]\]>/g, '').slice(0, 160), l: l.trim(), d: d.slice(0, 16) });
+      if (t && l && d && Date.now() - Date.parse(d) < 90 * 86400000) out.push({ t: t.replace(/<!\[CDATA\[|\]\]>/g, '').slice(0, 160), l: l.trim(), d: d.slice(0, 16) });
       if (out.length >= 5) break;
     }
     return out;
@@ -282,7 +282,7 @@ async function runRadar() {
   const items = []; const lines = [];
   for (const [label, q] of topics) { const n = await newsFor(q); n.forEach((x, i) => { items.push(x); lines.push('[' + label + '] ' + x.d + ' - ' + x.t); }); }
   if (!lines.length) { const out = { at: new Date().toISOString(), text: 'Nothing found today (no recent public news items matched).', sources: [] }; await kvPut('radar-latest', out); return out; }
-  const g = await geminiText('You are a market watcher for LAK Security Services (gate motors, garage doors, CCTV, Johannesburg). Below are real recent public headlines (last 3 weeks) with their topic tags. Use ONLY these headlines. Output exactly:\nDEMAND NOTES: up to 3 bullets, one sentence each, each tied to a headline.\nCOMPETITOR MOVES: bullets naming a company only if a headline names it and an offer or move; otherwise write "No competitor moves found in public news today".\nSUGGESTED RESPONSE: one practical action for LAK this week that follows from the demand notes.\nDo not invent figures, prices, companies or events. Plain text, no markdown.\n\nHEADLINES:\n' + lines.join('\n'), false);
+  const g = await geminiText('You are a market watcher for LAK Security Services (gate motors, garage doors, CCTV, Johannesburg). Below are real recent public headlines (last 3 months) with their topic tags. Use ONLY these headlines. Output exactly:\nDEMAND NOTES: up to 3 bullets, one sentence each, each tied to a headline.\nCOMPETITOR MOVES: bullets naming a company only if a headline names it and an offer or move; otherwise write "No competitor moves found in public news today".\nSUGGESTED RESPONSE: one practical action for LAK this week that follows from the demand notes.\nDo not invent figures, prices, companies or events. Plain text, no markdown.\n\nHEADLINES:\n' + lines.join('\n'), false);
   const out = { at: new Date().toISOString(), text: g.text.slice(0, 2000), sources: items.slice(0, 8).map(x => x.l).map(u => u.slice(0, 200)) };
   await kvPut('radar-latest', out); return out;
 }
