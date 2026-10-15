@@ -157,11 +157,87 @@ document.getElementById('savekey').onclick=async function(){
 const POSTSYS = `You turn a customer chat with LAK Security Services (gate motors, garage doors, CCTV, open 24 hours) into marketing output for the owner. Output exactly two parts, plain text, no markdown:
 SOCIAL POST: a ready-to-post Facebook/WhatsApp Status post (2-4 short sentences) that answers the customer's underlying question helpfully, never uses the customer's name or phone, never invents prices, guarantees or response times, and ends with a call to message LAK.
 WHAT THIS CHAT TELLS YOU: one or two short lines on the demand signal (what the customer needed, what kind of customers ask this). If the chat has too little content, say so briefly and base the post on the topic the customer raised.`;
+
+// ---- WhatsApp reply loop (linked account -> Operator webhook -> Gemini -> Operator /send) ----
+const crypto = require('crypto');
+const WH_SECRET = process.env.WEBHOOK_SECRET || '';
+const CONVOS = new Map();      // chatId -> { msgs: [], at }
+const SEEN = new Map();        // messageId -> ts (dedupe webhook retries)
+const DAILY = new Map();       // chatId+day -> bot replies count
+const MAX_REPLIES_PER_CHAT_PER_DAY = 40;
+const QUOTA_MSG = 'Our automated assistant has reached its free usage limit for today. Your message has been noted and a member of the LAK team will attend to you directly. You can also call LAK any time - we are open 24 hours.';
+const SLOW_MSG = 'Sorry, I am slow to answer right now. What do you need help with: gate motor, garage door or CCTV?';
+const NOTEXT_MSG = 'Thanks. I can only read typed messages here. Please type what you need help with: gate motor, garage door or CCTV?';
+
+function verifyWebhook(raw, sig) {
+  if (!WH_SECRET || !sig) return false;
+  try {
+    const expected = crypto.createHmac('sha256', WH_SECRET).update(raw).digest();
+    const got = Buffer.from(String(sig), 'hex');
+    return got.length === expected.length && crypto.timingSafeEqual(expected, got);
+  } catch (_) { return false; }
+}
+
+async function genReply(msgs) {
+  const chatKey = (await getTenantKey()) || KEY;
+  let quotaHit = false;
+  const chain = [MODEL, 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite'];
+  for (let i = 0; i < 4; i++) {
+    try {
+      const r = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', { method: 'POST', signal: AbortSignal.timeout(12000), headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + chatKey }, body: JSON.stringify({ model: chain[i % chain.length], messages: msgs }) });
+      const j = await r.json();
+      if (r.status === 429 || (j.error && /quota|rate.?limit|exhausted/i.test(String(j.error.message || '')))) quotaHit = true;
+      const t = j.choices && j.choices[0] && j.choices[0].message.content;
+      if (t) return { reply: String(t).slice(0, 1200), quotaHit: false };
+    } catch (_) {}
+  }
+  return { reply: quotaHit ? QUOTA_MSG : SLOW_MSG, quotaHit };
+}
+
+async function handleWaMessage(payload, selfTest) {
+  const d = payload.data || {};
+  if (payload.event !== 'message') return { skipped: 'event' };
+  if (d.fromMe) return { skipped: 'fromMe' };
+  const chatId = String(d.chatId || '');
+  if (!chatId || chatId.endsWith('@g.us') || chatId.startsWith('status@') || chatId.includes('broadcast') || chatId.endsWith('@newsletter')) return { skipped: 'not-a-customer-chat' };
+  const mid = d.messageId || '';
+  if (mid) { if (SEEN.has(mid)) return { skipped: 'duplicate' }; SEEN.set(mid, Date.now()); if (SEEN.size > 2000) { const cut = Date.now() - 6 * 3600 * 1000; for (const [k, v] of SEEN) if (v < cut) SEEN.delete(k); } }
+  const dayKey = chatId + new Date().toISOString().slice(0, 10);
+  const used = DAILY.get(dayKey) || 0;
+  if (used >= MAX_REPLIES_PER_CHAT_PER_DAY) return { skipped: 'daily-cap' };
+  let text = typeof d.text === 'string' ? d.text.trim() : '';
+  let reply, quotaHit = false;
+  if (!text) { reply = NOTEXT_MSG; }
+  else {
+    const c = CONVOS.get(chatId) && Date.now() - CONVOS.get(chatId).at < 24 * 3600 * 1000 ? CONVOS.get(chatId) : { msgs: [], at: Date.now() };
+    c.msgs.push({ role: 'user', content: text.slice(0, 1000) }); c.msgs = c.msgs.slice(-20);
+    const g = await genReply([{ role: 'system', content: SYSTEM }, ...c.msgs]);
+    reply = g.reply; quotaHit = g.quotaHit;
+    c.msgs.push({ role: 'assistant', content: reply }); c.at = Date.now(); CONVOS.set(chatId, c);
+  }
+  DAILY.set(dayKey, used + 1);
+  if (selfTest) return { selfTest: true, wouldSend: reply, quotaHit };
+  const r = await opFetch('/send', 'POST', { waAccountId: payload.waAccountId || LAK_ACC, to: chatId, text: reply });
+  console.log('WA_REPLY chat=' + chatId.replace(/\d(?=\d{4})/g, '*') + ' status=' + r.status);
+  return { sent: r.status >= 200 && r.status < 300, status: r.status };
+}
 const HITS = [];
 const POSTS = {};
 http.createServer(async (req, res) => {
   if (req.method === 'GET' && req.url.startsWith('/stats')) { const ok = process.env.STATS_KEY && req.url.includes('k=' + process.env.STATS_KEY); res.writeHead(ok ? 200 : 404, { 'Content-Type': 'application/json' }); res.end(ok ? JSON.stringify(HITS.slice(-100)) : '{}'); return; }
   if (req.method === 'GET' && req.url !== '/health' && !req.url.startsWith('/favicon')) { const h = { t: new Date().toISOString(), p: req.url.slice(0, 80), ua: String(req.headers['user-agent'] || '').slice(0, 90) }; HITS.push(h); console.log('HIT ' + JSON.stringify(h)); }
+  if (req.method === 'POST' && req.url === '/api/wa/webhook') {
+    let raw = ''; req.on('data', c => { raw += c; if (raw.length > 2e6) req.destroy(); });
+    req.on('end', async () => {
+      if (!verifyWebhook(raw, req.headers['x-webhook-signature'])) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end('{"error":"bad signature"}'); }
+      let p; try { p = JSON.parse(raw); } catch (_) { res.writeHead(400); return res.end('{}'); }
+      if (p.appId !== LAK_APP || p.tenantId !== LAK_TENANT) { res.writeHead(403, { 'Content-Type': 'application/json' }); return res.end('{"error":"wrong tenant"}'); }
+      if (p.selfTest === true) { const out = await handleWaMessage(p, true).catch(e => ({ error: String(e.message || e) })); res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify(out)); }
+      res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"ok":true}');
+      handleWaMessage(p, false).catch(e => console.log('WA_ERR ' + String(e.message || e)));
+    });
+    return;
+  }
   if (req.url === '/health') { res.writeHead(200); return res.end('ok'); }
   if (req.method === 'POST' && req.url === '/api/chat') {
     let b = ''; req.on('data', c => b += c); req.on('end', async () => {
