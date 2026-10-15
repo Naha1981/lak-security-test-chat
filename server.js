@@ -38,11 +38,15 @@ http.createServer(async (req, res) => {
         const { messages } = JSON.parse(b);
         const msgs = [{ role: 'system', content: SYSTEM }, ...messages.slice(-20).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content).slice(0, 1000) }))];
         let reply = null;
-        for (let i = 0; i < 3 && !reply; i++) {
-          const r = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + KEY }, body: JSON.stringify({ model: MODEL, messages: msgs }) });
-          const j = await r.json();
-          reply = j.choices && j.choices[0] && j.choices[0].message.content;
+        const chain = [MODEL, 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite'];
+        for (let i = 0; i < 6 && !reply; i++) {
+          try {
+            const r = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', { method: 'POST', signal: AbortSignal.timeout(9000), headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + KEY }, body: JSON.stringify({ model: chain[i % chain.length], messages: msgs }) });
+            const j = await r.json();
+            reply = j.choices && j.choices[0] && j.choices[0].message.content;
+          } catch (_) {}
         }
+        if (!reply) reply = 'Sorry, I am slow to answer right now. What do you need help with: gate motor, garage door, CCTV or electric fencing?';
         res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ reply: reply || null }));
       } catch (e) { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ reply: null })); }
     }); return;
