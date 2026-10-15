@@ -89,6 +89,7 @@ http.createServer(async (req, res) => {
             reply = j.choices && j.choices[0] && j.choices[0].message.content;
           } catch (_) {}
         }
+        if (!reply && mode === 'post') { reply = 'That one took too long. Please press the button again.'; if (POSTS) { const ip2 = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim(); const k2 = ip2 + new Date().toISOString().slice(0, 10); if (POSTS[k2]) POSTS[k2]--; } }
         if (!reply) reply = 'Sorry, I am slow to answer right now. What do you need help with: gate motor, garage door or CCTV?';
         res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ reply: reply || null }));
       } catch (e) { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ reply: null })); }
