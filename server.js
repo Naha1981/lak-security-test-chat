@@ -19,10 +19,26 @@ header{background:#202c33;padding:12px 16px}header b{display:block}header small{
 #log{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
 .m{max-width:80%;padding:8px 12px;border-radius:8px;white-space:pre-wrap;line-height:1.35}.u{align-self:flex-end;background:#005c4b}.b{align-self:flex-start;background:#202c33}
 form{display:flex;gap:8px;padding:10px;background:#202c33}input{flex:1;padding:12px;border-radius:20px;border:0;background:#2a3942;color:#e9edef;font-size:16px}button{border:0;border-radius:20px;padding:0 18px;background:#00a884;color:#fff;font-size:16px}
-.note{background:#182229;color:#8696a0;font-size:12px;padding:6px 12px;text-align:center}</style></head><body>
+.note{background:#182229;color:#8696a0;font-size:12px;padding:6px 12px;text-align:center}.up{background:#111b21;border-top:1px solid #2a3942}.up summary{padding:10px 16px;cursor:pointer;color:#00a884;font-weight:600}.up .in{max-height:48vh;overflow:auto;padding:4px 14px 14px}.up h4{margin:12px 0 4px;color:#e9edef}.up .tag{display:inline-block;background:#3b2f0b;color:#f5c542;font-size:11px;padding:2px 8px;border-radius:10px;margin-left:6px}.card{background:#202c33;border-radius:8px;padding:10px 12px;margin:8px 0;font-size:14px;line-height:1.4;white-space:pre-wrap}.card small{display:block;color:#8696a0;margin-top:6px}.up p{color:#8696a0;font-size:13px;margin:4px 0}</style></head><body>
 <header><b>LAK Security Services</b><small>Test preview by NahaLabs - not live yet</small></header>
 <div class="note">Pretend you are a customer. Type like you would on WhatsApp.</div>
 <div id="log"></div>
+<details class="up"><summary>Coming with your upgrade (preview, not live) &#9656;</summary><div class="in">
+<p>This chat only answers. On the upgrade, your WhatsApp also finds demand and turns your customer chats into content. Everything below is an EXAMPLE of what it would produce, not live.</p>
+<h4>1. Social posts made from your customer chats <span class="tag">EXAMPLE</span></h4>
+<div class="card">Gate motor not opening? Before you call anyone, check three things: is there power to the motor, is the manual release engaged, and has the remote battery gone flat. Still stuck? We are open 24 hours.
+<small>Built from: customers asking "my gate won't open". Example post only.</small></div>
+<div class="card">Garage door going up and down by itself, or stopping halfway? That is usually the springs or the sensor, not a new motor. Send us a message and we will tell you what it is before you spend money.
+<small>Built from: garage door repair questions. Example post only.</small></div>
+<div class="card">Is your CCTV recording, or only looking? A camera that is not saving footage will not help after a break-in. Ask us for a quick check of your cameras and recorder.
+<small>Built from: CCTV repair questions. Example post only.</small></div>
+<p>On the upgrade these would be drafted for you to approve, then posted to your pages.</p>
+<h4>2. Opportunity radar <span class="tag">ILLUSTRATIVE</span></h4>
+<div class="card">What people near you ask and search for: gate motor repair, garage door spring replacement, CCTV installation, remote not working.
+<small>Example layout. Your real numbers and area appear here once your upgrade is connected. No figures are shown because none are live.</small></div>
+<div class="card">Competitor watch: new offers, prices and posts from other security companies in your area, summarised once a week.
+<small>Example layout only.</small></div>
+</div></details>
 <form id="f"><input id="t" placeholder="Type a message" autocomplete="off"><button>Send</button></form>
 <script>
 const log=document.getElementById('log'),t=document.getElementById('t');let hist=[];
