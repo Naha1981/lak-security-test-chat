@@ -262,12 +262,28 @@ async function geminiText(prompt, search) {
 }
 const POST_RULES = 'Rules: plain text, no markdown. Never use any customer name or phone number. Never invent prices, guarantees, response times or offers. LAK is open 24 hours and does gate motors, garage doors and CCTV (no electric fencing). Each post is 2-4 short sentences, helpful first, ends with a simple invitation to message LAK on WhatsApp.';
 async function buildPosts(questions) {
-  const g = await geminiText('You write social posts for LAK Security Services (Johannesburg). Below are real questions customers sent LAK on WhatsApp today. Group them into themes, then output exactly:\nDEMAND NOTE: 2 sentences on what customers asked about most today (use only counts you can see in the list).\nPOST 1: ...\nPOST 2: ...\nPOST 3: ...\nEach post answers a theme from the list. ' + POST_RULES + '\n\nQUESTIONS:\n- ' + questions.join('\n- '), false);
+  const g = await geminiText('You write social posts for LAK Security Services (Johannesburg). Below are real questions customers sent LAK on WhatsApp today. Group them into themes, then output exactly:\nDEMAND NOTE: 2 sentences on what customers asked about most today (do not state exact counts).\nPOST 1: ...\nPOST 2: ...\nPOST 3: ...\nEach post answers a theme from the list. ' + POST_RULES + '\n\nQUESTIONS:\n- ' + questions.join('\n- '), false);
   return g.text;
 }
+async function newsFor(q) {
+  try {
+    const r = await fetch('https://news.google.com/rss/search?q=' + encodeURIComponent(q) + '&hl=en-ZA&gl=ZA&ceid=ZA:en', { signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const x = await r.text(); const out = [];
+    for (const m of x.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
+      const t = (/<title>([\s\S]*?)<\/title>/.exec(m[1]) || [])[1], l = (/<link>([\s\S]*?)<\/link>/.exec(m[1]) || [])[1], d = (/<pubDate>([\s\S]*?)<\/pubDate>/.exec(m[1]) || [])[1];
+      if (t && l && d && Date.now() - Date.parse(d) < 21 * 86400000) out.push({ t: t.replace(/<!\[CDATA\[|\]\]>/g, '').slice(0, 160), l: l.trim(), d: d.slice(0, 16) });
+      if (out.length >= 5) break;
+    }
+    return out;
+  } catch (_) { return []; }
+}
 async function runRadar() {
-  const g = await geminiText('You are a market watcher for LAK Security Services, a gate motor, garage door and CCTV installer/repairer in Johannesburg, South Africa. Use web search to find what is current today: (1) demand signals - what Johannesburg homeowners and small businesses are asking about or reacting to for gate motors, garage doors and CCTV (load-shedding or power-related gate failures, crime trends, seasonal issues, new products); (2) competitor moves - offers, prices or posts from Johannesburg gate motor, garage door and CCTV companies. Output exactly:\nDEMAND NOTES: 3 bullets, each one sentence, each stating only what a source says.\nCOMPETITOR MOVES: up to 3 bullets with the company name and what it did. If you find nothing current, say "Nothing found today".\nSUGGESTED RESPONSE: one practical action for LAK this week.\nDo not invent figures, prices or companies. Plain text, no markdown.', true);
-  const out = { at: new Date().toISOString(), text: g.text.slice(0, 2600), sources: g.sources };
+  const topics = [['Demand: gate motors and load shedding', 'gate motor Johannesburg load shedding'], ['Demand: crime and home security', 'Johannesburg home security burglary CCTV'], ['Demand: garage doors', 'garage door motor South Africa'], ['Competitors', 'gate motor garage door CCTV installer Johannesburg offer special']];
+  const items = []; const lines = [];
+  for (const [label, q] of topics) { const n = await newsFor(q); n.forEach((x, i) => { items.push(x); lines.push('[' + label + '] ' + x.d + ' - ' + x.t); }); }
+  if (!lines.length) { const out = { at: new Date().toISOString(), text: 'Nothing found today (no recent public news items matched).', sources: [] }; await kvPut('radar-latest', out); return out; }
+  const g = await geminiText('You are a market watcher for LAK Security Services (gate motors, garage doors, CCTV, Johannesburg). Below are real recent public headlines (last 3 weeks) with their topic tags. Use ONLY these headlines. Output exactly:\nDEMAND NOTES: up to 3 bullets, one sentence each, each tied to a headline.\nCOMPETITOR MOVES: bullets naming a company only if a headline names it and an offer or move; otherwise write "No competitor moves found in public news today".\nSUGGESTED RESPONSE: one practical action for LAK this week that follows from the demand notes.\nDo not invent figures, prices, companies or events. Plain text, no markdown.\n\nHEADLINES:\n' + lines.join('\n'), false);
+  const out = { at: new Date().toISOString(), text: g.text.slice(0, 2000), sources: items.slice(0, 8).map(x => x.l).map(u => u.slice(0, 200)) };
   await kvPut('radar-latest', out); return out;
 }
 async function runDigest(testQs) {
