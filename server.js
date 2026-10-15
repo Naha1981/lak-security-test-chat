@@ -210,6 +210,7 @@ async function handleWaMessage(payload, selfTest) {
   if (!text) { reply = NOTEXT_MSG; }
   else {
     const c = CONVOS.get(chatId) && Date.now() - CONVOS.get(chatId).at < 24 * 3600 * 1000 ? CONVOS.get(chatId) : { msgs: [], at: Date.now() };
+    recordQuestion(text).catch(() => {});
     c.msgs.push({ role: 'user', content: text.slice(0, 1000) }); c.msgs = c.msgs.slice(-20);
     const g = await genReply([{ role: 'system', content: SYSTEM }, ...c.msgs]);
     reply = g.reply; quotaHit = g.quotaHit;
@@ -221,9 +222,86 @@ async function handleWaMessage(payload, selfTest) {
   console.log('WA_REPLY chat=' + chatId.replace(/\d(?=\d{4})/g, '*') + ' status=' + r.status);
   return { sent: r.status >= 200 && r.status < 300, status: r.status };
 }
+
+// ---- Chat-fed content engine + opportunity radar (persisted in the Operator's encrypted tenant store) ----
+const TZ_OFF = 2 * 3600 * 1000; // SAST
+const sastDay = (t) => new Date((t || Date.now()) + TZ_OFF).toISOString().slice(0, 10);
+const sastHour = () => new Date(Date.now() + TZ_OFF).getUTCHours();
+async function kvPut(name, obj) {
+  const str = JSON.stringify(obj); const parts = [];
+  for (let i = 0; i < str.length; i += 3800) parts.push(str.slice(i, i + 3800));
+  for (let i = 0; i < parts.length; i++) { const r = await opFetch('/tenant-secrets/' + LAK_APP + '/' + LAK_TENANT + '/' + name + '-' + i, 'PUT', { value: parts[i] }); if (r.status !== 200) throw new Error('kv put ' + r.status); }
+  const m = await opFetch('/tenant-secrets/' + LAK_APP + '/' + LAK_TENANT + '/' + name + '-n', 'PUT', { value: String(parts.length) }); if (m.status !== 200) throw new Error('kv meta ' + m.status);
+}
+async function kvGet(name) {
+  const n = await opFetch('/tenant-secrets/' + LAK_APP + '/' + LAK_TENANT + '/' + name + '-n', 'GET'); if (n.status !== 200) return null;
+  let str = ''; for (let i = 0; i < parseInt(n.body.value, 10); i++) { const r = await opFetch('/tenant-secrets/' + LAK_APP + '/' + LAK_TENANT + '/' + name + '-' + i, 'GET'); if (r.status !== 200) return null; str += r.body.value; }
+  try { return JSON.parse(str); } catch (_) { return null; }
+}
+const QBUF = { day: '', items: [], dirty: false };
+function scrub(t) { return String(t).replace(/\+?\d[\d\s\-()]{6,}\d/g, '[number]').replace(/\s+/g, ' ').trim().slice(0, 140); }
+async function recordQuestion(text) {
+  const day = sastDay();
+  if (QBUF.day !== day) { QBUF.day = day; QBUF.items = (await kvGet('q' + day.replace(/-/g, ''))) || []; }
+  QBUF.items.push(scrub(text)); while (QBUF.items.join('|').length > 3500) QBUF.items.shift();
+  try { await kvPut('q' + day.replace(/-/g, ''), QBUF.items); } catch (e) { console.log('KV_ERR ' + e.message); }
+}
+async function geminiText(prompt, search) {
+  const k = (await getTenantKey()) || KEY; let lastErr = '';
+  for (const m of [MODEL, 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite']) {
+    try {
+      const body = { contents: [{ role: 'user', parts: [{ text: prompt }] }] }; if (search) body.tools = [{ google_search: {} }];
+      const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + m + ':generateContent', { method: 'POST', signal: AbortSignal.timeout(60000), headers: { 'Content-Type': 'application/json', 'x-goog-api-key': k }, body: JSON.stringify(body) });
+      const j = await r.json(); const c = j.candidates && j.candidates[0];
+      const txt = c && c.content && c.content.parts && c.content.parts.map(p => p.text || '').join('');
+      if (txt) { const src = ((c.groundingMetadata && c.groundingMetadata.groundingChunks) || []).map(g => g.web && g.web.uri).filter(Boolean).slice(0, 6); return { text: txt, sources: src, model: m }; }
+      lastErr = (j.error && j.error.message) || 'empty';
+    } catch (e) { lastErr = String(e.message || e); }
+  }
+  throw new Error('gemini: ' + lastErr.slice(0, 120));
+}
+const POST_RULES = 'Rules: plain text, no markdown. Never use any customer name or phone number. Never invent prices, guarantees, response times or offers. LAK is open 24 hours and does gate motors, garage doors and CCTV (no electric fencing). Each post is 2-4 short sentences, helpful first, ends with a simple invitation to message LAK on WhatsApp.';
+async function buildPosts(questions) {
+  const g = await geminiText('You write social posts for LAK Security Services (Johannesburg). Below are real questions customers sent LAK on WhatsApp today. Group them into themes, then output exactly:\nDEMAND NOTE: 2 sentences on what customers asked about most today (use only counts you can see in the list).\nPOST 1: ...\nPOST 2: ...\nPOST 3: ...\nEach post answers a theme from the list. ' + POST_RULES + '\n\nQUESTIONS:\n- ' + questions.join('\n- '), false);
+  return g.text;
+}
+async function runRadar() {
+  const g = await geminiText('You are a market watcher for LAK Security Services, a gate motor, garage door and CCTV installer/repairer in Johannesburg, South Africa. Use web search to find what is current today: (1) demand signals - what Johannesburg homeowners and small businesses are asking about or reacting to for gate motors, garage doors and CCTV (load-shedding or power-related gate failures, crime trends, seasonal issues, new products); (2) competitor moves - offers, prices or posts from Johannesburg gate motor, garage door and CCTV companies. Output exactly:\nDEMAND NOTES: 3 bullets, each one sentence, each stating only what a source says.\nCOMPETITOR MOVES: up to 3 bullets with the company name and what it did. If you find nothing current, say "Nothing found today".\nSUGGESTED RESPONSE: one practical action for LAK this week.\nDo not invent figures, prices or companies. Plain text, no markdown.', true);
+  const out = { at: new Date().toISOString(), text: g.text.slice(0, 2600), sources: g.sources };
+  await kvPut('radar-latest', out); return out;
+}
+async function runDigest(testQs) {
+  const day = sastDay(); const key = 'q' + day.replace(/-/g, '');
+  const qs = testQs || (QBUF.day === day ? QBUF.items : (await kvGet(key)) || []);
+  let out = { day, count: qs.length, test: !!testQs };
+  if (!qs.length) out.text = 'No customer questions came in on WhatsApp today, so no posts were drafted.';
+  else out.text = (await buildPosts(qs)).slice(0, 2800);
+  if (!testQs) await kvPut('digest-latest', out);
+  return out;
+}
+let lastAuto = '';
+setInterval(async () => {
+  try { const day = sastDay(); if (sastHour() >= 17 && lastAuto !== day) { lastAuto = day; const ex = await kvGet('digest-latest'); if (!ex || ex.day !== day) { await runDigest(); await runRadar(); console.log('AUTO_DIGEST_DONE ' + day); } } } catch (e) { console.log('AUTO_ERR ' + e.message); }
+}, 10 * 60 * 1000);
+function dashboardAuth(req) { const m = /[?&]k=([^&]+)/.exec(req.url); return !!(process.env.STATS_KEY && m && m[1] === process.env.STATS_KEY); }
+const esc = (x) => String(x || '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 const HITS = [];
 const POSTS = {};
 http.createServer(async (req, res) => {
+  if (req.url.startsWith('/digest') || req.url.startsWith('/api/digest') || req.url.startsWith('/api/radar')) {
+    if (!dashboardAuth(req)) { res.writeHead(404); return res.end(); }
+    (async () => {
+      try {
+        if (req.method === 'POST' && req.url.startsWith('/api/digest/run')) { const b = await readBody(req); return json(res, 200, await runDigest(Array.isArray(b.questions) ? b.questions.map(scrub) : null)); }
+        if (req.method === 'POST' && req.url.startsWith('/api/radar/run')) return json(res, 200, await runRadar());
+        if (req.url.startsWith('/api/digest/latest')) return json(res, 200, { digest: await kvGet('digest-latest'), radar: await kvGet('radar-latest') });
+        const d = await kvGet('digest-latest'), r = await kvGet('radar-latest');
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+        return res.end('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LAK daily digest</title><body style="font-family:system-ui;max-width:640px;margin:20px auto;padding:0 14px;line-height:1.45"><h2>LAK daily digest</h2><h3>Posts from today\'s customer questions' + (d ? ' (' + esc(d.day) + ', ' + d.count + ' questions)' : '') + '</h3><pre style="white-space:pre-wrap;font-family:inherit">' + esc(d ? d.text : 'Nothing yet. The first digest is built after 17:00.') + '</pre><h3>Opportunity radar' + (r ? ' (' + esc(r.at.slice(0, 10)) + ')' : '') + '</h3><pre style="white-space:pre-wrap;font-family:inherit">' + esc(r ? r.text : 'Nothing yet.') + '</pre>' + (r && r.sources.length ? '<p style="font-size:12px">Sources: ' + r.sources.map(u => esc(u)).join('<br>') + '</p>' : '') + '</body>');
+      } catch (e) { json(res, 500, { error: String(e.message || e) }); }
+    })();
+    return;
+  }
   if (req.method === 'GET' && req.url.startsWith('/stats')) { const ok = process.env.STATS_KEY && req.url.includes('k=' + process.env.STATS_KEY); res.writeHead(ok ? 200 : 404, { 'Content-Type': 'application/json' }); res.end(ok ? JSON.stringify(HITS.slice(-100)) : '{}'); return; }
   if (req.method === 'GET' && req.url !== '/health' && !req.url.startsWith('/favicon')) { const h = { t: new Date().toISOString(), p: req.url.slice(0, 80), ua: String(req.headers['user-agent'] || '').slice(0, 90) }; HITS.push(h); console.log('HIT ' + JSON.stringify(h)); }
   if (req.method === 'POST' && req.url === '/api/wa/webhook') {
