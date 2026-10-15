@@ -206,6 +206,7 @@ async function handleWaMessage(payload, selfTest) {
   const used = DAILY.get(dayKey) || 0;
   if (used >= MAX_REPLIES_PER_CHAT_PER_DAY) return { skipped: 'daily-cap' };
   let text = typeof d.text === 'string' ? d.text.trim() : '';
+  if (text && chatId === (await ownerJid())) { const orp = await handleOwnerReply(text); if (orp) { if (selfTest) return { selfTest: true, ownerReply: orp }; await opFetch('/send', 'POST', { waAccountId: payload.waAccountId || LAK_ACC, to: chatId, text: orp }); return { ownerHandled: true }; } }
   let reply, quotaHit = false;
   if (!text) { reply = NOTEXT_MSG; }
   else {
@@ -293,6 +294,7 @@ async function runDigest(testQs) {
   if (!qs.length) out.text = 'No customer questions came in on WhatsApp today, so no posts were drafted.';
   else out.text = (await buildPosts(qs)).slice(0, 2800);
   if (!testQs) await kvPut('digest-latest', out);
+  if (!testQs && qs.length) { const posts = parsePosts(out.text); await kvPut('pending-posts', { day, posts }); out.drafts = await sendDraftsToOwner(day, posts); }
   return out;
 }
 let lastAuto = '';
@@ -301,6 +303,25 @@ setInterval(async () => {
 }, 10 * 60 * 1000);
 function dashboardAuth(req) { const m = /[?&]k=([^&]+)/.exec(req.url); return !!(process.env.STATS_KEY && m && m[1] === process.env.STATS_KEY); }
 const esc = (x) => String(x || '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+// ---- Approval step: drafts go to the owner's WhatsApp, nothing is marked approved without her YES ----
+let OWNER = { jid: process.env.LAK_OWNER_JID || '' };
+async function ownerJid() { if (OWNER.jid) return OWNER.jid; const o = await kvGet('owner-jid'); if (o && o.jid) OWNER.jid = o.jid; return OWNER.jid; }
+function parsePosts(text) { const out = []; for (const m of String(text).matchAll(/POST\s*(\d)\s*:\s*([\s\S]*?)(?=\n\s*POST\s*\d\s*:|$)/g)) out.push({ n: parseInt(m[1], 10), text: m[2].trim(), status: 'pending' }); return out; }
+async function sendDraftsToOwner(day, posts) {
+  const jid = await ownerJid(); if (!jid || !posts.length) return { sent: 0, reason: jid ? 'no posts' : 'owner number not set yet' };
+  let n = 0;
+  for (const p of posts) { const r = await opFetch('/send', 'POST', { waAccountId: LAK_ACC, to: jid, text: 'Draft post ' + p.n + ' of ' + posts.length + ':\n\n' + p.text + '\n\nReply YES ' + p.n + ' to approve or NO ' + p.n + ' to skip. Nothing is published without your YES.' }); if (r.status >= 200 && r.status < 300) n++; }
+  return { sent: n };
+}
+async function handleOwnerReply(text) {
+  const m = /^\s*(yes|approve|no|skip)\s*(\d)?\s*$/i.exec(text); if (!m) return null;
+  const st = await kvGet('pending-posts'); if (!st || !st.posts.some(p => p.status === 'pending')) return 'There are no drafts waiting for your approval right now.';
+  const yes = /^(yes|approve)$/i.test(m[1]); const hit = [];
+  for (const p of st.posts) if (p.status === 'pending' && (!m[2] || String(p.n) === m[2])) { p.status = yes ? 'approved' : 'skipped'; p.at = new Date().toISOString(); hit.push(p.n); }
+  await kvPut('pending-posts', st);
+  return hit.length ? (yes ? 'Approved: post ' + hit.join(', ') + '. Posting to your pages is not switched on yet, so it is saved as approved and nothing has been published.' : 'Skipped: post ' + hit.join(', ') + '.') : 'No waiting draft with that number.';
+}
 const HITS = [];
 const POSTS = {};
 http.createServer(async (req, res) => {
@@ -310,6 +331,8 @@ http.createServer(async (req, res) => {
       try {
         if (req.method === 'POST' && req.url.startsWith('/api/digest/run')) { const b = await readBody(req); return json(res, 200, await runDigest(Array.isArray(b.questions) ? b.questions.map(scrub) : null)); }
         if (req.method === 'POST' && req.url.startsWith('/api/radar/run')) return json(res, 200, await runRadar());
+        if (req.method === 'POST' && req.url.startsWith('/api/owner')) { const b = await readBody(req); const jid = String(b.jid || '').replace(/\D/g, ''); if (jid.length < 9) return json(res, 400, { error: 'jid' }); OWNER.jid = jid + '@s.whatsapp.net'; await kvPut('owner-jid', { jid: OWNER.jid }); return json(res, 200, { ok: true }); }
+        if (req.url.startsWith('/api/pending')) return json(res, 200, await kvGet('pending-posts'));
         if (req.url.startsWith('/api/digest/latest')) return json(res, 200, { digest: await kvGet('digest-latest'), radar: await kvGet('radar-latest') });
         const d = await kvGet('digest-latest'), r = await kvGet('radar-latest');
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
