@@ -32,7 +32,7 @@ function readBody(req) {
 
 function json(res, code, obj) { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(obj)); }
 
-const SYSTEM = `You are the instant WhatsApp-style reply assistant for LAK Security Services, a South African business that installs and repairs gate motors, garage doors and CCTV. LAK is open 24 hours. This is a TEST preview built by NahaLabs so the owner can see how enquiries would be handled. Rules:
+const SYSTEM = `You are the instant WhatsApp-style reply assistant for LAK Security Services, a South African business that installs and repairs gate motors, garage doors and CCTV. LAK is open 24 hours. Built by NahaLabs. Rules:
 - Reply in short, friendly, plain messages (1-3 sentences). One question at a time.
 - Work out which service the customer needs (gate motor, garage door, CCTV, or other).
 - Collect what a site visit needs, one detail at a time. Gate motor or garage door: make/brand if known, what is happening (not opening, noisy, remote not working, power cut), manual or sliding or swing. CCTV: new install or repair, number of cameras, house or business.
@@ -78,7 +78,7 @@ textarea{width:100%;min-height:64px;border-radius:8px;border:0;background:#2a394
 <p>Each week you get a short list of drafted posts built from the radar and your chats. You tap approve, it posts to your pages. Nothing goes out without your yes.</p>
 <div class="card">Monday: gate motor tips post  -  waiting for your approval<br>Wednesday: CCTV check offer  -  waiting for your approval<br>Friday: garage door springs post  -  waiting for your approval</div></section>
 
-<section><h2>It also answers your customers <span class="tag live">LIVE TEST</span></h2>
+<section><h2>It also answers your customers</h2>
 <p>The basics, in your hours and services. Type like a customer.</p>
 <div id="log"></div>
 <form id="f"><input id="t" placeholder="Type a message" autocomplete="off"><button>Send</button></form></section>
@@ -90,7 +90,7 @@ add('b','Hi, thanks for contacting LAK Security Services. What do you need help 
 document.getElementById('f').onsubmit=async e=>{e.preventDefault();const v=t.value.trim();if(!v)return;t.value='';add('u',v);hist.push({role:'user',content:v});const w=add('b','...');
 try{const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:hist})});const j=await r.json();w.textContent=j.reply||'Sorry, something went wrong.';hist.push({role:'assistant',content:j.reply||''})}catch(_){w.textContent='Sorry, something went wrong.'}};
 document.getElementById('pb').onclick=async()=>{const o=document.getElementById('po'),q=document.getElementById('q').value.trim();o.style.display='block';if(!q){o.textContent='Type a customer question first.';return}o.textContent='Writing... (the first one can take up to a minute while the free server wakes)';
-try{const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'post',messages:[{role:'user',content:q},{role:'user',content:'Write the output now from the customer message above.'}]})});const j=await r.json();o.textContent=(j.reply||'Sorry, try again.')+'\\n\\n(Example output. On the upgrade this is drafted for you to approve, then posted to your pages.)'}catch(_){o.textContent='Sorry, try again.'}};
+try{const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'post',messages:[{role:'user',content:q},{role:'user',content:'Write the output now from the customer message above.'}]})});const j=await r.json();o.textContent=(j.reply||'Sorry, try again.')+'\\n\\n(On the upgrade this is drafted for you to approve, then posted to your pages.)'}catch(_){o.textContent='Sorry, try again.'}};
 </script></body></html>`;
 const ONBOARD = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LAK Security concierge setup - NahaLabs</title>
 <style>*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:#0b141a;color:#e9edef;line-height:1.5}
