@@ -58,25 +58,25 @@ textarea{width:100%;min-height:64px;border-radius:8px;border:0;background:#2a394
 .m{max-width:85%;padding:8px 12px;border-radius:8px;white-space:pre-wrap;margin:6px 0}.u{margin-left:auto;background:#005c4b}.b{background:#202c33}
 #log{max-height:260px;overflow:auto;display:flex;flex-direction:column}form{display:flex;gap:8px;margin-top:8px}input{flex:1;padding:12px;border-radius:20px;border:0;background:#2a3942;color:#e9edef;font-size:16px}form button{border:0;border-radius:20px;padding:0 18px;background:#2a3942;color:#e9edef;font-size:16px}
 .foot{color:#8696a0;font-size:12px;text-align:center;margin-top:20px}</style></head><body><div class="w">
-<div class="hero"><small>BUILT FOR LAK SECURITY SERVICES BY NAHALABS</small><h1>Your WhatsApp should find you customers, not just answer them</h1><p>Any bot can reply to messages. This is the part it cannot do: it watches your market, writes your content from real customer questions, and posts for you. Below is what your upgrade does.</p></div>
+<div class="hero"><small>BUILT FOR LAK SECURITY SERVICES BY NAHALABS</small><h1>Your WhatsApp answers customers 24 hours, and turns their questions into posts</h1><p>Any bot can reply to messages. Today: it answers your customers on WhatsApp and writes post ideas from their questions. Market watch and posting are planned for later and are not live yet.</p></div>
 
-<section><h2>1. Content engine: your customer chats become posts</h2>
-<p>Type a question a customer might send you. It writes a ready-to-post social post and tells you what the question says about demand.</p>
+<section><h2>1. Content engine (preview): customer questions become posts</h2>
+<p>This is a preview. Type a question a customer might send you. It writes a ready-to-post social post and tells you what the question says about demand.</p>
 <textarea id="q" placeholder="e.g. My sliding gate motor is not opening and the remote is dead"></textarea>
 <button class="btn" id="pb" type="button">Write my post</button>
 <div class="card" id="po" style="display:none"></div>
-<p style="margin-top:12px">Examples of posts it writes from your common questions</p><p style="margin-top:2px;font-size:12px;color:#8696a0">Sample data. Fictional records.</p>
+<p style="margin-top:12px">Examples of posts it can write from common questions</p><p style="margin-top:2px;font-size:12px;color:#8696a0">Sample data. Fictional records.</p>
 <div class="card">Gate motor not opening? Before you call anyone, check three things: is there power to the motor, is the manual release engaged, and has the remote battery gone flat. Still stuck? We are open 24 hours.<small>Built from: customers asking "my gate won't open".</small></div>
 <div class="card">Garage door going up and down by itself, or stopping halfway? That is usually the springs or the sensor, not a new motor. Send us a message and we will tell you what it is before you spend money.<small>Built from: garage door repair questions.</small></div>
 <div class="card">Is your CCTV recording, or only looking? A camera that is not saving footage will not help after a break-in. Ask us for a quick check of your cameras and recorder.<small>Built from: CCTV repair questions.</small></div></section>
 
-<section><h2>2. Opportunity radar: what your area wants before it calls you</h2>
-<p>Once connected to your area, it scouts what people search and ask about security and shows you where demand is rising. No figures are shown here because none are live.</p>
-<div class="card">Competitor watch: new offers, prices and posts from other security companies near you, summarised weekly, with one suggested response.</div></section>
+<section><h2>2. Opportunity radar - coming next, not live yet</h2>
+<p>This is not built yet. The plan is to show what people in your area ask about security. Nothing is running for you today.</p>
+</section>
 
-<section><h2>3. Posting: it publishes for you, you stay in control</h2>
-<p>Each week you get a short list of drafted posts built from the radar and your chats. You tap approve, it posts to your pages. Nothing goes out without your yes.</p>
-<div class="card">Monday: gate motor tips post  -  waiting for your approval<br>Wednesday: CCTV check offer  -  waiting for your approval<br>Friday: garage door springs post  -  waiting for your approval</div></section>
+<section><h2>3. Posting - coming next, not live yet</h2>
+<p>This is not built yet and nothing posts for you today. When it exists, nothing will go out without your yes.</p>
+</section>
 
 <section><h2>It also answers your customers</h2>
 <p>The basics, in your hours and services. Type like a customer.</p>
