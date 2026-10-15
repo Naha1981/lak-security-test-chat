@@ -279,10 +279,10 @@ async function newsFor(q) {
     return out;
   } catch (_) { return []; }
 }
-async function runRadar() {
+async function runRadar(pre) {
   const topics = [['Demand: gate motors and load shedding', 'gate motor Johannesburg load shedding'], ['Demand: crime and home security', 'Johannesburg home security burglary CCTV'], ['Demand: garage doors', 'garage door motor South Africa'], ['Competitors', 'gate motor garage door CCTV installer Johannesburg offer special']];
   const items = []; const lines = [];
-  for (const [label, q] of topics) { const n = await newsFor(q); n.forEach((x, i) => { items.push(x); lines.push('[' + label + '] ' + x.d + ' - ' + x.t); }); }
+  for (const [label, q] of topics) { const n = pre ? ((pre[label] || []).slice(0, 5)) : await newsFor(q); n.forEach((x, i) => { items.push(x); lines.push('[' + label + '] ' + x.d + ' - ' + x.t); }); }
   if (!lines.length) { const out = { at: new Date().toISOString(), text: 'Nothing found today (no recent public news items matched). diag=' + (global.RSS_DIAG || ''), sources: [] }; await kvPut('radar-latest', out); return out; }
   const g = await geminiText('You are a market watcher for LAK Security Services (gate motors, garage doors, CCTV, Johannesburg). Below are real recent public headlines (last 3 months) with their topic tags. Use ONLY these headlines. Output exactly:\nDEMAND NOTES: up to 3 bullets, one sentence each, each tied to a headline.\nCOMPETITOR MOVES: bullets naming a company only if a headline names it and an offer or move; otherwise write "No competitor moves found in public news today".\nSUGGESTED RESPONSE: one practical action for LAK this week that follows from the demand notes.\nDo not invent figures, prices, companies or events. Plain text, no markdown.\n\nHEADLINES:\n' + lines.join('\n'), false);
   const out = { at: new Date().toISOString(), text: g.text.slice(0, 2000), sources: items.slice(0, 8).map(x => x.l).map(u => u.slice(0, 200)) };
@@ -331,6 +331,7 @@ http.createServer(async (req, res) => {
     (async () => {
       try {
         if (req.method === 'POST' && req.url.startsWith('/api/digest/run')) { const b = await readBody(req); return json(res, 200, await runDigest(Array.isArray(b.questions) ? b.questions.map(scrub) : null)); }
+        if (req.method === 'POST' && req.url.startsWith('/api/radar/ingest')) { const b = await readBody(req); const pre = {}; for (const k of Object.keys(b.items || {})) pre[k] = (b.items[k] || []).filter(x => x && x.t && x.l && x.d).map(x => ({ t: String(x.t).slice(0, 160), l: String(x.l).slice(0, 300), d: String(x.d).slice(0, 16) })); return json(res, 200, await runRadar(pre)); }
         if (req.method === 'POST' && req.url.startsWith('/api/radar/run')) return json(res, 200, await runRadar());
         if (req.method === 'POST' && req.url.startsWith('/api/owner')) { const b = await readBody(req); const jid = String(b.jid || '').replace(/\D/g, ''); if (jid.length < 9) return json(res, 400, { error: 'jid' }); OWNER.jid = jid + '@s.whatsapp.net'; await kvPut('owner-jid', { jid: OWNER.jid }); return json(res, 200, { ok: true }); }
         if (req.url.startsWith('/api/pending')) return json(res, 200, await kvGet('pending-posts'));
