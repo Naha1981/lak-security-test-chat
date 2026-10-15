@@ -1,6 +1,37 @@
 const http = require('http');
 const KEY = process.env.GEMINI_API_KEY;
 const MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+const OP = process.env.OPERATOR_BASE_URL || 'https://my-own-whatsapp-2z5h.onrender.com';
+const OPKEY = process.env.OPERATOR_API_KEY || '';
+const LAK_APP = 'lak-concierge';
+const LAK_TENANT = 'lak-security';
+const LAK_ACC = process.env.LAK_WA_ACCOUNT_ID || '';
+let tenantKeyCache = { key: null, at: 0 };
+
+function opFetch(path, method, body) {
+  return fetch(OP + path, {
+    method,
+    signal: AbortSignal.timeout(20000),
+    headers: { 'Content-Type': 'application/json', 'x-api-key': OPKEY, 'x-app-id': LAK_APP, 'x-tenant-id': LAK_TENANT },
+    body: body ? JSON.stringify(body) : undefined,
+  }).then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }));
+}
+
+async function getTenantKey() {
+  if (tenantKeyCache.key && Date.now() - tenantKeyCache.at < 5 * 60 * 1000) return tenantKeyCache.key;
+  try {
+    const r = await opFetch('/tenant-secrets/' + LAK_APP + '/' + LAK_TENANT + '/gemini_api_key', 'GET');
+    if (r.status === 200 && r.body.value) { tenantKeyCache = { key: r.body.value, at: Date.now() }; return r.body.value; }
+  } catch (_) {}
+  return null;
+}
+
+function readBody(req) {
+  return new Promise(resolve => { let b = ''; req.on('data', c => b += c); req.on('end', () => { try { resolve(JSON.parse(b || '{}')); } catch (_) { resolve({}); } }); });
+}
+
+function json(res, code, obj) { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(obj)); }
+
 const SYSTEM = `You are the instant WhatsApp-style reply assistant for LAK Security Services, a South African business that installs and repairs gate motors, garage doors and CCTV. LAK is open 24 hours. This is a TEST preview built by NahaLabs so the owner can see how enquiries would be handled. Rules:
 - Reply in short, friendly, plain messages (1-3 sentences). One question at a time.
 - Work out which service the customer needs (gate motor, garage door, CCTV, or other).
@@ -65,6 +96,68 @@ try{const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'appl
 document.getElementById('pb').onclick=async()=>{const o=document.getElementById('po'),q=document.getElementById('q').value.trim();o.style.display='block';if(!q){o.textContent='Type a customer question first.';return}o.textContent='Writing... (the first one can take up to a minute while the free server wakes)';
 try{const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'post',messages:[{role:'user',content:q},{role:'user',content:'Write the output now from the customer message above.'}]})});const j=await r.json();o.textContent=(j.reply||'Sorry, try again.')+'\\n\\n(Example output. On the upgrade this is drafted for you to approve, then posted to your pages.)'}catch(_){o.textContent='Sorry, try again.'}};
 </script></body></html>`;
+const ONBOARD = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LAK Security concierge setup - NahaLabs</title>
+<style>*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:#0b141a;color:#e9edef;line-height:1.5}
+.w{max-width:640px;margin:0 auto;padding:24px 16px 48px}
+.brand{display:flex;align-items:baseline;gap:10px;padding:8px 0 4px}.brand b{font-size:18px;letter-spacing:.02em}.brand span{color:#00a884;font-size:12px;font-weight:700;letter-spacing:.08em}
+h1{font-size:22px;margin:12px 0 4px}p.sub{color:#aebac1;margin:0 0 8px;font-size:14px}
+section{background:#111b21;border:1px solid #1f2c34;border-radius:12px;padding:18px;margin:16px 0}section h2{font-size:16px;margin:0 0 4px}section>p{color:#8696a0;font-size:13px;margin:2px 0 12px}
+input{width:100%;padding:12px 14px;border-radius:8px;border:1px solid #2a3942;background:#202c33;color:#e9edef;font-size:16px;font-family:inherit}
+.btn{background:#00a884;color:#fff;border:0;border-radius:8px;padding:12px 16px;font-size:15px;font-weight:600;margin-top:10px;cursor:pointer}.btn:disabled{opacity:.5;cursor:default}
+.code{font-size:34px;letter-spacing:.14em;font-weight:700;text-align:center;background:#202c33;border:1px dashed #3b4a54;border-radius:10px;padding:16px;margin:12px 0 4px}
+.small{font-size:12px;color:#8696a0;text-align:center}
+.status{display:flex;align-items:center;gap:8px;font-size:14px;margin-top:8px}.dot{width:10px;height:10px;border-radius:50%;background:#f5c542}.dot.on{background:#4ade80}
+ol{color:#aebac1;font-size:14px;padding-left:20px;margin:10px 0}ol li{margin:4px 0}
+.ok{color:#4ade80;font-size:14px}.err{color:#f87171;font-size:13px;margin-top:8px}
+.foot{color:#8696a0;font-size:12px;text-align:center;margin-top:24px}</style></head><body><div class="w">
+<div class="brand"><b>NahaLabs</b><span>LAK SECURITY SERVICES</span></div>
+<h1>Concierge setup</h1><p class="sub">Two steps and your WhatsApp concierge is live: link your business WhatsApp, then add your free Gemini key.</p>
+
+<section><h2>Step 1 - Link your WhatsApp</h2>
+<p>Enter the WhatsApp Business number your customers message. We show you a code; you enter it in WhatsApp on that phone. Nothing is posted or sent during setup.</p>
+<input id="num" type="tel" placeholder="+27 ..." autocomplete="tel">
+<button class="btn" id="getcode" type="button">Get my linking code</button>
+<div id="codewrap" style="display:none">
+<div class="code" id="code"></div>
+<div class="small" id="exp"></div>
+<ol><li>Open WhatsApp on the phone for that number</li><li>Go to <b>Linked devices</b></li><li>Tap <b>Link a device</b></li><li>Tap <b>Link with phone number instead</b></li><li>Enter this code</li></ol></div>
+<div class="status"><span class="dot" id="dot"></span><span id="stext">Waiting for linking</span></div>
+<div class="err" id="e1"></div></section>
+
+<section><h2>Step 2 - Your Gemini key</h2>
+<p>The concierge answers with your own free Google Gemini key, so your usage is yours alone. Get one at aistudio.google.com (Get API key) and paste it here. It is stored encrypted on NahaLabs servers, used only for your concierge, and never asked for in WhatsApp chat.</p>
+<input id="gkey" type="password" placeholder="AIza..." autocomplete="off">
+<button class="btn" id="savekey" type="button">Save my key</button>
+<div class="err" id="e2"></div><div class="ok" id="ok2"></div>
+<p style="margin-top:10px">If the free daily limit is reached, your customers get a clear message that the LAK team will attend to them directly - never silence.</p></section>
+
+<div class="foot">Setup by NahaLabs for LAK Security Services. Your number and key are used only to run your concierge.</div></div>
+<script>
+var poll=null;
+function err(id,m){document.getElementById(id).textContent=m||''}
+document.getElementById('getcode').onclick=async function(){
+  err('e1');var b=document.getElementById('getcode');b.disabled=true;
+  try{
+    var r=await fetch('/api/onboard/pairing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phoneNumber:document.getElementById('num').value})});
+    var j=await r.json();
+    if(j.status==='connected'){setConnected();return}
+    if(j.code){document.getElementById('codewrap').style.display='block';document.getElementById('code').textContent=j.code;
+      var exp=new Date(j.expiresAt).getTime();var t=setInterval(function(){var s=Math.max(0,Math.round((exp-Date.now())/1000));document.getElementById('exp').textContent=s>0?('Code expires in '+s+'s - get a new one if it lapses'):'Code lapsed - tap the button for a fresh one';if(s<=0)clearInterval(t)},1000);
+      startPoll();}
+    else err('e1',j.error||'Something went wrong. Try again.');
+  }catch(_){err('e1','Network problem. Try again.')}finally{b.disabled=false}
+};
+function setConnected(){document.getElementById('dot').className='dot on';document.getElementById('stext').textContent='Connected - your WhatsApp is linked';document.getElementById('codewrap').style.display='none';if(poll)clearInterval(poll)}
+function startPoll(){if(poll)clearInterval(poll);poll=setInterval(async function(){
+  try{var r=await fetch('/api/onboard/status');var j=await r.json();if(j.connected)setConnected()}catch(_){}},4000)}
+document.getElementById('savekey').onclick=async function(){
+  err('e2');document.getElementById('ok2').textContent='';var b=document.getElementById('savekey');b.disabled=true;
+  try{var r=await fetch('/api/onboard/gemini-key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:document.getElementById('gkey').value})});
+  var j=await r.json();
+  if(j.stored){document.getElementById('ok2').textContent='Saved. Your key is stored encrypted and only your concierge can use it.';document.getElementById('gkey').value=''}
+  else err('e2',j.error||'Could not save. Try again.')}catch(_){err('e2','Network problem. Try again.')}finally{b.disabled=false}
+};
+</script></body></html>`;
 const POSTSYS = `You turn a customer chat with LAK Security Services (gate motors, garage doors, CCTV, open 24 hours) into marketing output for the owner. Output exactly two parts, plain text, no markdown:
 SOCIAL POST: a ready-to-post Facebook/WhatsApp Status post (2-4 short sentences) that answers the customer's underlying question helpfully, never uses the customer's name or phone, never invents prices, guarantees or response times, and ends with a call to message LAK.
 WHAT THIS CHAT TELLS YOU: one or two short lines on the demand signal (what the customer needed, what kind of customers ask this). If the chat has too little content, say so briefly and base the post on the topic the customer raised.`;
@@ -80,20 +173,58 @@ http.createServer(async (req, res) => {
         const { messages, mode } = JSON.parse(b);
         if (mode === 'post') { const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim(); const d = new Date().toISOString().slice(0, 10); const k = ip + d; POSTS[k] = (POSTS[k] || 0) + 1; if (POSTS[k] > 3) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ reply: 'That is your 3 free tries for today. On the upgrade it writes your posts every week from your real customer chats. Message us and we will set up your first batch.' })); } } HITS.push({ t: new Date().toISOString(), chat: messages.length, last: String(messages[messages.length - 1].content).slice(0, 80) });
         const msgs = [{ role: 'system', content: mode === 'post' ? POSTSYS : SYSTEM }, ...messages.slice(-20).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content).slice(0, 1000) }))];
-        let reply = null;
+        const chatKey = (await getTenantKey()) || KEY;
+        let reply = null; let quotaHit = false;
         const chain = [MODEL, 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite'];
         for (let i = 0; i < 6 && !reply; i++) {
           try {
-            const r = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', { method: 'POST', signal: AbortSignal.timeout(9000), headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + KEY }, body: JSON.stringify({ model: chain[i % chain.length], messages: msgs }) });
+            const r = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', { method: 'POST', signal: AbortSignal.timeout(9000), headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + chatKey }, body: JSON.stringify({ model: chain[i % chain.length], messages: msgs }) });
             const j = await r.json();
+            if (r.status === 429 || (j.error && /quota|rate.?limit|exhausted/i.test(String(j.error.message || '')))) quotaHit = true;
             reply = j.choices && j.choices[0] && j.choices[0].message.content;
           } catch (_) {}
         }
         if (!reply && mode === 'post') { reply = 'That one took too long. Please press the button again.'; if (POSTS) { const ip2 = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim(); const k2 = ip2 + new Date().toISOString().slice(0, 10); if (POSTS[k2]) POSTS[k2]--; } }
+        if (!reply && quotaHit) reply = 'Our automated assistant has reached its free usage limit for today. Your message has been noted and a member of the LAK team will attend to you directly. You can also call LAK any time - we are open 24 hours.';
         if (!reply) reply = 'Sorry, I am slow to answer right now. What do you need help with: gate motor, garage door or CCTV?';
         res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ reply: reply || null }));
       } catch (e) { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ reply: null })); }
     }); return;
   }
+  if (req.method === 'GET' && req.url === '/onboard') { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end(ONBOARD); }
+
+  if (req.method === 'POST' && req.url === '/api/onboard/pairing') {
+    const body = await readBody(req);
+    const phoneNumber = String(body.phoneNumber || '').trim();
+    if (!/^\+?\d{8,15}$/.test(phoneNumber.replace(/[\s-]/g, ''))) return json(res, 400, { error: 'Enter the number in international format, e.g. +2782...' });
+    if (!LAK_ACC) return json(res, 503, { error: 'Onboarding is not fully configured yet. NahaLabs has been notified.' });
+    try {
+      const r = await opFetch('/accounts/' + LAK_ACC + '/pairing-code', 'POST', { phoneNumber: phoneNumber.replace(/[\s-]/g, '') });
+      if (r.status === 200) return json(res, 200, { status: r.body.status, code: r.body.pairingCodeDisplay, expiresAt: r.body.expiresAt });
+      if (r.body && r.body.error === 'ALREADY_CONNECTED') return json(res, 200, { status: 'connected' });
+      return json(res, 502, { error: (r.body && r.body.message) || 'Could not get a code right now. Try again in a moment.' });
+    } catch (_) { return json(res, 502, { error: 'Could not reach the connection service. Try again in a moment.' }); }
+  }
+
+  if (req.method === 'GET' && req.url === '/api/onboard/status') {
+    if (!LAK_ACC) return json(res, 503, { error: 'Onboarding is not fully configured yet.' });
+    try {
+      const r = await opFetch('/accounts/' + LAK_ACC + '/status', 'GET');
+      if (r.status === 200) return json(res, 200, { connected: !!r.body.isConnected, status: r.body.status, phoneNumber: r.body.phoneNumber });
+      return json(res, 502, { error: 'Status unavailable right now.' });
+    } catch (_) { return json(res, 502, { error: 'Status unavailable right now.' }); }
+  }
+
+  if (req.method === 'POST' && req.url === '/api/onboard/gemini-key') {
+    const body = await readBody(req);
+    const key = String(body.key || '').trim();
+    if (key.length < 20 || key.length > 200 || /\s/.test(key)) return json(res, 400, { error: 'That does not look like a Gemini API key. Paste the full key.' });
+    try {
+      const r = await opFetch('/tenant-secrets/' + LAK_APP + '/' + LAK_TENANT + '/gemini_api_key', 'PUT', { value: key });
+      if (r.status === 200) { tenantKeyCache = { key, at: Date.now() }; return json(res, 200, { stored: true }); }
+      return json(res, 502, { error: 'Could not store the key right now. Try again in a moment.' });
+    } catch (_) { return json(res, 502, { error: 'Could not store the key right now. Try again in a moment.' }); }
+  }
+
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(PAGE);
 }).listen(process.env.PORT || 3000);
