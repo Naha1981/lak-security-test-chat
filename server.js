@@ -44,7 +44,7 @@ const SYSTEM = `You are the instant WhatsApp-style reply assistant for LAK Secur
   SUMMARY FOR LAK: service | issue | name | area | phone | preferred time
 - If the customer says it is an emergency (break-in), tell them to call the LAK team directly and local emergency services if there is danger.
 - Stay on topic. If asked something unrelated, politely steer back.`;
-const PAGE = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LAK Security - growth engine preview</title>
+const PAGE = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LAK Security - growth engine by NahaLabs</title>
 <style>*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:#0b141a;color:#e9edef;line-height:1.45}
 .w{max-width:760px;margin:0 auto;padding:0 16px 40px}
 .hero{padding:28px 0 8px}.hero small{color:#00a884;font-weight:700;letter-spacing:.06em}.hero h1{font-size:26px;margin:6px 0 8px}.hero p{color:#aebac1;margin:0}
@@ -58,35 +58,31 @@ textarea{width:100%;min-height:64px;border-radius:8px;border:0;background:#2a394
 .m{max-width:85%;padding:8px 12px;border-radius:8px;white-space:pre-wrap;margin:6px 0}.u{margin-left:auto;background:#005c4b}.b{background:#202c33}
 #log{max-height:260px;overflow:auto;display:flex;flex-direction:column}form{display:flex;gap:8px;margin-top:8px}input{flex:1;padding:12px;border-radius:20px;border:0;background:#2a3942;color:#e9edef;font-size:16px}form button{border:0;border-radius:20px;padding:0 18px;background:#2a3942;color:#e9edef;font-size:16px}
 .foot{color:#8696a0;font-size:12px;text-align:center;margin-top:20px}</style></head><body><div class="w">
-<div class="hero"><small>PREVIEW BUILT FOR LAK SECURITY SERVICES BY NAHALABS</small><h1>Your WhatsApp should find you customers, not just answer them</h1><p>Any bot can reply to messages. This is the part it cannot do: it watches your market, writes your content from real customer questions, and posts for you. Below is what your upgrade does. Anything marked EXAMPLE or ILLUSTRATIVE is not live data.</p></div>
+<div class="hero"><small>BUILT FOR LAK SECURITY SERVICES BY NAHALABS</small><h1>Your WhatsApp should find you customers, not just answer them</h1><p>Any bot can reply to messages. This is the part it cannot do: it watches your market, writes your content from real customer questions, and posts for you. Below is what your upgrade does.</p></div>
 
-<section><h2>1. Content engine: your customer chats become posts <span class="tag live">LIVE TEST</span></h2>
+<section><h2>1. Content engine: your customer chats become posts</h2>
 <p>Type a question a customer might send you. It writes a ready-to-post social post and tells you what the question says about demand.</p>
 <textarea id="q" placeholder="e.g. My sliding gate motor is not opening and the remote is dead"></textarea>
 <button class="btn" id="pb" type="button">Write my post</button>
 <div class="card" id="po" style="display:none"></div>
-<p style="margin-top:12px">Examples of posts it writes from your common questions <span class="tag">EXAMPLE</span></p>
+<p style="margin-top:12px">Examples of posts it writes from your common questions</p><p style="margin-top:2px;font-size:12px;color:#8696a0">Sample data. Fictional records.</p>
 <div class="card">Gate motor not opening? Before you call anyone, check three things: is there power to the motor, is the manual release engaged, and has the remote battery gone flat. Still stuck? We are open 24 hours.<small>Built from: customers asking "my gate won't open".</small></div>
 <div class="card">Garage door going up and down by itself, or stopping halfway? That is usually the springs or the sensor, not a new motor. Send us a message and we will tell you what it is before you spend money.<small>Built from: garage door repair questions.</small></div>
 <div class="card">Is your CCTV recording, or only looking? A camera that is not saving footage will not help after a break-in. Ask us for a quick check of your cameras and recorder.<small>Built from: CCTV repair questions.</small></div></section>
 
-<section><h2>2. Opportunity radar: what your area wants before it calls you <span class="tag">ILLUSTRATIVE</span></h2>
+<section><h2>2. Opportunity radar: what your area wants before it calls you</h2>
 <p>Once connected to your area, it scouts what people search and ask about security and shows you where demand is rising. No figures are shown here because none are live.</p>
-<div class="row"><b>Gate motor repair</b><div class="bar"><i style="width:70%"></i></div></div>
-<div class="row"><b>Garage door springs</b><div class="bar"><i style="width:45%"></i></div></div>
-<div class="row"><b>CCTV installation</b><div class="bar"><i style="width:58%"></i></div></div>
-<div class="row"><b>Remote not working</b><div class="bar"><i style="width:35%"></i></div></div>
-<div class="card">Competitor watch: new offers, prices and posts from other security companies near you, summarised weekly, with one suggested response.<small>Example layout only. Bar lengths are placeholders, not data.</small></div></section>
+<div class="card">Competitor watch: new offers, prices and posts from other security companies near you, summarised weekly, with one suggested response.</div></section>
 
-<section><h2>3. Posting: it publishes for you, you stay in control <span class="tag">EXAMPLE</span></h2>
+<section><h2>3. Posting: it publishes for you, you stay in control</h2>
 <p>Each week you get a short list of drafted posts built from the radar and your chats. You tap approve, it posts to your pages. Nothing goes out without your yes.</p>
-<div class="card">Monday: gate motor tips post  -  waiting for your approval<br>Wednesday: CCTV check offer  -  waiting for your approval<br>Friday: garage door springs post  -  waiting for your approval<small>Example schedule only.</small></div></section>
+<div class="card">Monday: gate motor tips post  -  waiting for your approval<br>Wednesday: CCTV check offer  -  waiting for your approval<br>Friday: garage door springs post  -  waiting for your approval</div></section>
 
 <section><h2>It also answers your customers <span class="tag live">LIVE TEST</span></h2>
 <p>The basics, in your hours and services. Type like a customer.</p>
 <div id="log"></div>
 <form id="f"><input id="t" placeholder="Type a message" autocomplete="off"><button>Send</button></form></section>
-<div class="foot">Test preview by NahaLabs. Not connected to your WhatsApp or social pages yet.</div></div>
+<div class="foot">Built by NahaLabs for LAK Security Services.</div></div>
 <script>
 const log=document.getElementById('log'),t=document.getElementById('t');let hist=[];
 function add(c,x){const d=document.createElement('div');d.className='m '+c;d.textContent=x;log.appendChild(d);log.scrollTop=log.scrollHeight;return d}
@@ -171,7 +167,7 @@ http.createServer(async (req, res) => {
     let b = ''; req.on('data', c => b += c); req.on('end', async () => {
       try {
         const { messages, mode } = JSON.parse(b);
-        if (mode === 'post') { const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim(); const d = new Date().toISOString().slice(0, 10); const k = ip + d; POSTS[k] = (POSTS[k] || 0) + 1; if (POSTS[k] > 3) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ reply: 'That is your 3 free tries for today. On the upgrade it writes your posts every week from your real customer chats. Message us and we will set up your first batch.' })); } } HITS.push({ t: new Date().toISOString(), chat: messages.length, last: String(messages[messages.length - 1].content).slice(0, 80) });
+        if (mode === 'post') { const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim(); const d = new Date().toISOString().slice(0, 10); const k = ip + d; POSTS[k] = (POSTS[k] || 0) + 1; if (POSTS[k] > 3) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ reply: 'That is the 3 free post drafts for today. On the upgrade it writes your posts every week from your real customer chats. Message us and we will set up your first batch.' })); } } HITS.push({ t: new Date().toISOString(), chat: messages.length, last: String(messages[messages.length - 1].content).slice(0, 80) });
         const msgs = [{ role: 'system', content: mode === 'post' ? POSTSYS : SYSTEM }, ...messages.slice(-20).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content).slice(0, 1000) }))];
         const chatKey = (await getTenantKey()) || KEY;
         let reply = null; let quotaHit = false;
