@@ -1,4 +1,7 @@
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const ICONS = { '/favicon.svg': ['favicon.svg', 'image/svg+xml'], '/favicon.ico': ['favicon.ico', 'image/x-icon'], '/favicon-16.png': ['favicon-16.png', 'image/png'], '/favicon-32.png': ['favicon-32.png', 'image/png'], '/apple-touch-icon.png': ['apple-touch-icon.png', 'image/png'], '/icon-512.png': ['icon-512.png', 'image/png'] }; 
 const KEY = process.env.GEMINI_API_KEY;
 const MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 const OP = process.env.OPERATOR_BASE_URL || 'https://my-own-whatsapp-2z5h.onrender.com';
@@ -44,7 +47,7 @@ const SYSTEM = `You are the instant WhatsApp-style reply assistant for LAK Secur
   SUMMARY FOR LAK: service | issue | name | area | phone | preferred time
 - If the customer says it is an emergency (break-in), tell them to call the LAK team directly and local emergency services if there is danger.
 - Stay on topic. If asked something unrelated, politely steer back.`;
-const PAGE = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LAK Security - growth engine by NahaLabs</title>
+const PAGE = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2"><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=2"><link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png?v=2"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2"><title>LAK Security - growth engine by NahaLabs</title>
 <style>*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:#0b141a;color:#e9edef;line-height:1.45}
 .w{max-width:760px;margin:0 auto;padding:0 16px 40px}
 .hero{padding:28px 0 8px}.hero small{color:#00a884;font-weight:700;letter-spacing:.06em}.hero h1{font-size:26px;margin:6px 0 8px}.hero p{color:#aebac1;margin:0}
@@ -92,7 +95,7 @@ try{const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'appl
 document.getElementById('pb').onclick=async()=>{const o=document.getElementById('po'),q=document.getElementById('q').value.trim();o.style.display='block';if(!q){o.textContent='Type a customer question first.';return}o.textContent='Writing... (the first one can take up to a minute while the free server wakes)';
 try{const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'post',messages:[{role:'user',content:q},{role:'user',content:'Write the output now from the customer message above.'}]})});const j=await r.json();o.textContent=(j.reply||'Sorry, try again.')+'\\n\\n(On the upgrade this is drafted for you to approve, then posted to your pages.)'}catch(_){o.textContent='Sorry, try again.'}};
 </script></body></html>`;
-const ONBOARD = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LAK Security concierge setup - NahaLabs</title>
+const ONBOARD = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2"><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=2"><link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png?v=2"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2"><title>LAK Security concierge setup - NahaLabs</title>
 <style>*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:#0b141a;color:#e9edef;line-height:1.5}
 .w{max-width:640px;margin:0 auto;padding:24px 16px 48px}
 .brand{display:flex;align-items:baseline;gap:10px;padding:8px 0 4px}.brand b{font-size:18px;letter-spacing:.02em}.brand span{color:#00a884;font-size:12px;font-weight:700;letter-spacing:.08em}
@@ -326,6 +329,12 @@ async function handleOwnerReply(text) {
 const HITS = [];
 const POSTS = {};
 http.createServer(async (req, res) => {
+  const icon = ICONS[req.url.split('?')[0]];
+  if (icon && (req.method === 'GET' || req.method === 'HEAD')) {
+    res.writeHead(200, { 'Content-Type': icon[1], 'Cache-Control': 'public, max-age=86400' });
+    return res.end(req.method === 'HEAD' ? undefined : fs.readFileSync(path.join(__dirname, 'public', icon[0])));
+  }
+
   if (req.url.startsWith('/digest') || req.url.startsWith('/api/digest') || req.url.startsWith('/api/radar')) {
     if (!dashboardAuth(req)) { res.writeHead(404); return res.end(); }
     (async () => {
@@ -338,7 +347,7 @@ http.createServer(async (req, res) => {
         if (req.url.startsWith('/api/digest/latest')) return json(res, 200, { digest: await kvGet('digest-latest'), radar: await kvGet('radar-latest') });
         const d = await kvGet('digest-latest'), r = await kvGet('radar-latest');
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-        return res.end('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LAK daily digest</title><body style="font-family:system-ui;max-width:640px;margin:20px auto;padding:0 14px;line-height:1.45"><h2>LAK daily digest</h2><h3>Posts from today\'s customer questions' + (d ? ' (' + esc(d.day) + ', ' + d.count + ' questions)' : '') + '</h3><pre style="white-space:pre-wrap;font-family:inherit">' + esc(d ? d.text : 'Nothing yet. The first digest is built after 17:00.') + '</pre><h3>Opportunity radar' + (r ? ' (' + esc(r.at.slice(0, 10)) + ')' : '') + '</h3><pre style="white-space:pre-wrap;font-family:inherit">' + esc(r ? r.text : 'Nothing yet.') + '</pre>' + (r && r.sources.length ? '<p style="font-size:12px">Sources: ' + r.sources.map(u => esc(u)).join('<br>') + '</p>' : '') + '</body>');
+        return res.end('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2"><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=2"><link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png?v=2"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2"><title>LAK daily digest</title><body style="font-family:system-ui;max-width:640px;margin:20px auto;padding:0 14px;line-height:1.45"><h2>LAK daily digest</h2><h3>Posts from today\'s customer questions' + (d ? ' (' + esc(d.day) + ', ' + d.count + ' questions)' : '') + '</h3><pre style="white-space:pre-wrap;font-family:inherit">' + esc(d ? d.text : 'Nothing yet. The first digest is built after 17:00.') + '</pre><h3>Opportunity radar' + (r ? ' (' + esc(r.at.slice(0, 10)) + ')' : '') + '</h3><pre style="white-space:pre-wrap;font-family:inherit">' + esc(r ? r.text : 'Nothing yet.') + '</pre>' + (r && r.sources.length ? '<p style="font-size:12px">Sources: ' + r.sources.map(u => esc(u)).join('<br>') + '</p>' : '') + '</body>');
       } catch (e) { json(res, 500, { error: String(e.message || e) }); }
     })();
     return;
